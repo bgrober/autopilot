@@ -1,5 +1,6 @@
 node_modules/
 .claude/*.local.md
+.claude/memory/
 *.db
 *.lance/
 .vectordb/
