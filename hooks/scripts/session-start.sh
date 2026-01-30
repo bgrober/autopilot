@@ -18,11 +18,11 @@ if [ -d "$USER_MEMORY_DIR/patterns" ]; then
     category=$(grep -m1 "^category:" "$f" 2>/dev/null | sed 's/category: *//' || echo "general")
     summary=$(grep -m1 "^## " "$f" 2>/dev/null | sed 's/^## //' || head -3 "$f" | tail -1)
     if [ -n "$summary" ]; then
-      patterns="${patterns}${category}|${summary}|${f}\n"
+      patterns="${patterns}${category}|${summary}|${f}"$'\n'
     fi
   done
   if [ -n "$patterns" ]; then
-    output="${output}\n<autopilot-memories scope=\"user\">\n## Learned Preferences & Patterns\n${patterns}</autopilot-memories>\n"
+    output="${output}"$'\n'"<autopilot-memories scope=\"user\">"$'\n'"## Learned Preferences & Patterns"$'\n'"${patterns}</autopilot-memories>"$'\n'
   fi
 fi
 
@@ -34,11 +34,11 @@ if [ -d "$PROJECT_MEMORY_DIR/conventions" ]; then
     category=$(grep -m1 "^category:" "$f" 2>/dev/null | sed 's/category: *//' || echo "general")
     summary=$(grep -m1 "^## " "$f" 2>/dev/null | sed 's/^## //' || head -3 "$f" | tail -1)
     if [ -n "$summary" ]; then
-      conventions="${conventions}${category}|${summary}|${f}\n"
+      conventions="${conventions}${category}|${summary}|${f}"$'\n'
     fi
   done
   if [ -n "$conventions" ]; then
-    output="${output}\n<autopilot-memories scope=\"project\">\n## Project Conventions\n${conventions}</autopilot-memories>\n"
+    output="${output}"$'\n'"<autopilot-memories scope=\"project\">"$'\n'"## Project Conventions"$'\n'"${conventions}</autopilot-memories>"$'\n'
   fi
 fi
 
@@ -54,17 +54,17 @@ for scope_dir in "$USER_MEMORY_DIR" "$PROJECT_MEMORY_DIR"; do
         date_part=$(basename "$f" .md)
         summary=$(head -5 "$f" | grep -v "^---" | grep -v "^$" | head -1)
         if [ -n "$summary" ]; then
-          sessions="${sessions}${date_part}|${summary}\n"
+          sessions="${sessions}${date_part}|${summary}"$'\n'
         fi
       done
       if [ -n "$sessions" ]; then
-        output="${output}\n<autopilot-recent-sessions scope=\"${scope_name}\">\n${sessions}</autopilot-recent-sessions>\n"
+        output="${output}"$'\n'"<autopilot-recent-sessions scope=\"${scope_name}\">"$'\n'"${sessions}</autopilot-recent-sessions>"$'\n'
       fi
     fi
   fi
 done
 
 if [ -n "$output" ]; then
-  # Output as system message for Claude to see
-  printf '{"systemMessage": "%s"}' "$(echo -e "$output" | sed 's/"/\\"/g' | tr '\n' ' ')"
+  # Use jq for safe JSON encoding of the output string
+  jq -n --arg msg "$output" '{"systemMessage": $msg}'
 fi

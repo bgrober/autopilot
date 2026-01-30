@@ -28,9 +28,9 @@ export function userScopeDir(): string {
   return join(homedir(), ".claude");
 }
 
-/** .claude/ relative to CWD (or a given project root) */
+/** .claude/ relative to project root (prefers CLAUDE_PROJECT_DIR env var) */
 export function projectScopeDir(cwd?: string): string {
-  return join(cwd ?? process.cwd(), ".claude");
+  return join(cwd ?? process.env.CLAUDE_PROJECT_DIR ?? process.cwd(), ".claude");
 }
 
 export function memoryScopeDir(
@@ -80,13 +80,16 @@ export async function writeMemoryFile(
   const slug = slugify(memory.content);
   const filePath = join(dir, `${slug}.md`);
 
+  const yamlEscape = (s: string): string =>
+    /[:#"'\[\]{},|>&*!?@`]/.test(s) ? `"${s.replace(/\\/g, "\\\\").replace(/"/g, '\\"')}"` : s;
+
   const frontmatter = [
     "---",
-    `id: ${memory.id}`,
-    `category: ${memory.category}`,
-    `scope: ${memory.scope}`,
+    `id: ${yamlEscape(memory.id)}`,
+    `category: ${yamlEscape(memory.category)}`,
+    `scope: ${yamlEscape(memory.scope)}`,
     `importance: ${memory.importance}`,
-    `tags: [${memory.tags.map((t) => `"${t}"`).join(", ")}]`,
+    `tags: [${memory.tags.map((t) => `"${t.replace(/\\/g, "\\\\").replace(/"/g, '\\"')}"`).join(", ")}]`,
     `created_at: "${memory.created_at}"`,
     "---",
   ].join("\n");
@@ -94,6 +97,39 @@ export async function writeMemoryFile(
   const fileContent = `${frontmatter}\n\n${memory.content}\n`;
   await Bun.write(filePath, fileContent);
   return filePath;
+}
+
+// ---------------------------------------------------------------------------
+// Delete a markdown memory file by ID
+// ---------------------------------------------------------------------------
+
+export async function deleteMemoryFileById(
+  id: string,
+  scope: "user" | "project",
+  cwd?: string,
+): Promise<boolean> {
+  const dir = memoryScopeDir(scope, cwd);
+  try {
+    const glob = new Bun.Glob("**/*.md");
+    for await (const path of glob.scan({ cwd: dir, absolute: true })) {
+      try {
+        const raw = await Bun.file(path).text();
+        // Quick check before full parse
+        if (!raw.includes(`id: ${id}`)) continue;
+        const parsed = parseMemoryFile(raw);
+        if (parsed && parsed.frontmatter.id === id) {
+          const { unlink } = await import("node:fs/promises");
+          await unlink(path);
+          return true;
+        }
+      } catch {
+        // Skip unreadable files
+      }
+    }
+  } catch {
+    // Directory doesn't exist
+  }
+  return false;
 }
 
 // ---------------------------------------------------------------------------

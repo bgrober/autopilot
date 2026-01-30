@@ -7,6 +7,7 @@ import {
   searchMemories,
   storeMemory,
   deleteMemories,
+  deleteByIds,
   getStats,
   rebuildIndex,
 } from "./db.ts";
@@ -26,6 +27,14 @@ const CategoryEnum = z.enum([
 
 const ScopeEnum = z.enum(["user", "project"]);
 const ScopeWithAllEnum = z.enum(["user", "project", "all"]);
+
+// ---------------------------------------------------------------------------
+// Helpers
+// ---------------------------------------------------------------------------
+
+function projectDir(): string {
+  return process.env.CLAUDE_PROJECT_DIR ?? process.cwd();
+}
 
 // ---------------------------------------------------------------------------
 // Server setup
@@ -73,7 +82,7 @@ server.tool(
         scope: args.scope,
         limit: args.limit,
         category: args.category,
-        cwd: process.cwd(),
+        cwd: projectDir(),
       });
 
       if (results.length === 0) {
@@ -134,7 +143,7 @@ server.tool(
   async (args) => {
     try {
       const id = crypto.randomUUID();
-      const cwd = process.cwd();
+      const cwd = projectDir();
 
       // Store in vector DB (with dedup check)
       const result = await storeMemory({
@@ -158,19 +167,26 @@ server.tool(
         };
       }
 
-      // Also write the markdown file
-      const filePath = await writeMemoryFile(
-        {
-          id,
-          content: args.content,
-          category: args.category,
-          scope: args.scope,
-          importance: args.importance,
-          tags: args.tags,
-          created_at: new Date().toISOString(),
-        },
-        cwd,
-      );
+      // Also write the markdown file — roll back DB insert on failure
+      let filePath: string;
+      try {
+        filePath = await writeMemoryFile(
+          {
+            id,
+            content: args.content,
+            category: args.category,
+            scope: args.scope,
+            importance: args.importance,
+            tags: args.tags,
+            created_at: new Date().toISOString(),
+          },
+          cwd,
+        );
+      } catch (writeError) {
+        // Roll back the vector DB insert to keep stores in sync
+        await deleteByIds([id], args.scope, cwd);
+        throw writeError;
+      }
 
       return {
         content: [
@@ -222,7 +238,7 @@ server.tool(
     try {
       const result = await rebuildIndex({
         scope: args.scope,
-        cwd: process.cwd(),
+        cwd: projectDir(),
       });
 
       return {
@@ -273,7 +289,7 @@ server.tool(
     try {
       const stats = await getStats({
         scope: args.scope,
-        cwd: process.cwd(),
+        cwd: projectDir(),
       });
 
       return {
@@ -322,7 +338,7 @@ server.tool(
         query: args.query,
         scope: args.scope,
         confirm: args.confirm,
-        cwd: process.cwd(),
+        cwd: projectDir(),
       });
 
       if (!args.confirm) {

@@ -9,6 +9,7 @@ import {
   userScopeDir,
   projectScopeDir,
   scanMemoryFiles,
+  deleteMemoryFileById,
 } from "./markdown.ts";
 
 // ---------------------------------------------------------------------------
@@ -27,6 +28,7 @@ export interface MemoryRecord {
 }
 
 export interface MemorySearchResult {
+  id: string;
   content: string;
   category: string;
   scope: string;
@@ -204,6 +206,7 @@ export async function searchMemories(opts: {
         }
 
         allResults.push({
+          id: row.id as string,
           content: row.content as string,
           category: row.category as string,
           scope: row.scope as string,
@@ -298,6 +301,27 @@ export async function storeMemory(opts: {
 }
 
 /**
+ * Delete specific records by their IDs. Used for rollback on failed writes.
+ */
+export async function deleteByIds(
+  ids: string[],
+  scope: "user" | "project",
+  cwd?: string,
+): Promise<void> {
+  const dbPath = primaryDbPath(scope, cwd);
+  const table = await getTable(dbPath);
+  if (!table) return;
+
+  for (const id of ids) {
+    try {
+      await table.delete(`id = '${id}'`);
+    } catch {
+      // Best effort
+    }
+  }
+}
+
+/**
  * Delete memories matching a query.
  */
 export async function deleteMemories(opts: {
@@ -324,12 +348,17 @@ export async function deleteMemories(opts: {
   const table = await getTable(dbPath);
   if (!table) return { found, deleted: 0 };
 
-  // Delete matching records by content match
+  // Delete matching records by ID (safe — UUIDs contain only hex + hyphens)
   let deleted = 0;
   for (const memory of found) {
     try {
-      const escapedContent = memory.content.replace(/'/g, "''");
-      await table.delete(`content = '${escapedContent}'`);
+      await table.delete(`id = '${memory.id}'`);
+      // Also delete the corresponding markdown file
+      await deleteMemoryFileById(
+        memory.id,
+        scope,
+        cwd,
+      );
       deleted++;
     } catch {
       // Skip individual delete failures
