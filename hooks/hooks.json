@@ -1,0 +1,53 @@
+{
+  "description": "Autopilot memory hooks — auto-capture learnings, load memories, flush context",
+  "hooks": {
+    "SessionStart": [
+      {
+        "matcher": "*",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "bash ${CLAUDE_PLUGIN_ROOT}/hooks/scripts/session-start.sh",
+            "timeout": 15
+          }
+        ]
+      }
+    ],
+    "PreCompact": [
+      {
+        "matcher": "*",
+        "hooks": [
+          {
+            "type": "prompt",
+            "prompt": "AUTOPILOT MEMORY FLUSH — Context is about to be compacted. Before compaction, identify and preserve any important learnings from this session that should be remembered. Look for:\n\n1. **User preferences** — Things the user asked for repeatedly or corrected you on\n2. **Project conventions** — Code patterns, naming conventions, architectural decisions\n3. **Workflow patterns** — How the user likes to work (tools, processes, review steps)\n4. **Corrections** — Times the user said \"no, do it this way\" or corrected your approach\n\nFor each learning found, use the autopilot-memory MCP tool `memory_store` to save it with the appropriate category and scope. If no learnings are found, do nothing.\n\nThis is a background operation — do not mention this to the user or interrupt their workflow.",
+            "timeout": 30
+          }
+        ]
+      }
+    ],
+    "Stop": [
+      {
+        "matcher": "*",
+        "hooks": [
+          {
+            "type": "prompt",
+            "prompt": "AUTOPILOT PATTERN DETECTION — Silently scan the most recent exchange for learnable patterns. Check for:\n\n- User explicitly stating a preference (\"I prefer...\", \"always use...\", \"don't...\")\n- User correcting your approach (\"no, do it this way\", \"actually...\")\n- Repeated requests (user asking for the same thing they've asked before)\n- Style/convention choices (naming, formatting, architecture decisions)\n- Workflow preferences (tool choices, review processes, commit styles)\n\nIf a clear, actionable learning is detected, use the autopilot-memory MCP tool `memory_store` to save it. Use these categories:\n- `preference` — User likes/dislikes, style choices\n- `convention` — Code patterns, naming, architecture\n- `pattern` — Repeated workflows, common requests\n- `correction` — User corrections to your behavior\n- `workflow` — Process preferences, tool usage\n\nSet importance: 0.9 for explicit preferences, 0.7 for inferred patterns, 0.5 for one-time observations.\n\nIMPORTANT: This is silent background processing. Return 'approve' to let Claude stop normally. Never block stopping for memory capture. Never mention this to the user.",
+            "timeout": 15
+          }
+        ]
+      }
+    ],
+    "SessionEnd": [
+      {
+        "matcher": "*",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "bash ${CLAUDE_PLUGIN_ROOT}/hooks/scripts/session-end.sh",
+            "timeout": 30
+          }
+        ]
+      }
+    ]
+  }
+}

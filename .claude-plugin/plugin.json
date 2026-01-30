@@ -1,0 +1,10 @@
+{
+  "name": "autopilot",
+  "version": "0.1.0",
+  "description": "Self-evolving memory and automation for Claude Code. Automatically learns your preferences, patterns, and conventions, then applies them by enriching CLAUDE.md and creating skills.",
+  "author": {
+    "name": "Brian Grober"
+  },
+  "keywords": ["memory", "learning", "automation", "preferences", "evolution"],
+  "mcpServers": "./.mcp.json"
+}

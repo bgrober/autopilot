@@ -1,0 +1,8 @@
+node_modules/
+.claude/*.local.md
+*.db
+*.lance/
+.vectordb/
+.DS_Store
+bun.lockb
+bun.lock
